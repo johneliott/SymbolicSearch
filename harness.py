@@ -1,3 +1,4 @@
+import sys
 import json
 import subprocess
 import itertools
@@ -11,7 +12,7 @@ class LispKernel:
             ['sbcl', '--script', script_path],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=sys.stderr,
             text=True
         )
 
@@ -44,6 +45,10 @@ def sample_permutations(seq, N):
 
 def evaluate_orbit(kernel, formula, base_seq, context=None, N=500):
     base = kernel.run_sequence(formula, base_seq, context)
+    if base.get("status") == "init_conflict":
+        print("Context is inherently contradictory. Skipping orbit evaluation.")
+        return base, []
+
     deltas = []
     samples = sample_permutations(base_seq, N)
     
@@ -158,9 +163,13 @@ def main():
         base, deltas = evaluate_orbit(kernel, formula, base_seq, context=context, N=200)
         print("\nBASE EXECUTION:")
         print(base)
-        print("\nSUMMARY:")
-        print(json.dumps(summarize(deltas), indent=2))
-        plot_results(deltas)
+        
+        if deltas:
+            print("\nSUMMARY:")
+            print(json.dumps(summarize(deltas), indent=2))
+            plot_results(deltas)
+        else:
+            print("\nNo permutations evaluated due to initial context conflict.")
     finally:
         kernel.close()
 
