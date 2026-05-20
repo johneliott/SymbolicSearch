@@ -14,7 +14,6 @@ The theoretical formulation, methodology, and ongoing notes for this framework c
 *   [The LEGO Bin Analogy](https://docs.google.com/document/d/106pWM471TeMmkFkNuzdlfH_obuVzOLFF1O99mTmnTPo/edit?usp=sharing)
 *   [Theoretical Intuition](https://docs.google.com/document/d/1Iatv2ceMATE1ZuM3xn8pW-_jRTXDSyoa_5Fif4WqAGM/edit?usp=sharing)
 *   [Empirical Study Design](https://docs.google.com/document/d/18h5eRQK6Ce6lHeLzHPrEQsXuUlrd3fk9Q8lHXuy32T0/edit?usp=sharing)
-*   [Result Interpretations](https://docs.google.com/document/d/11QvYh9nLwjqMqpgxK7e5Wp9e9xQ7fXcFJAyNqW2ZB7o/edit?usp=sharing)
 *   [Potential Applications](https://docs.google.com/document/d/18I2sywKv9rfcKYKnu45_qLsSbnVRMhZSAQYWXHk47Rw/edit?usp=sharing)
 
 ## Setup and Usage
