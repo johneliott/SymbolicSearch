@@ -15,8 +15,7 @@
     (let ((input (read-line nil nil)))
       (unless input (return))
       (let* ((parsed (parse-naive-json input))
-             ;; Note: The keys might be read as symbols depending on package.
-             ;; If the string is "formula", `read` turns it into the symbol `FORMULA`.
+             (context-list (getf parsed 'context))
              (formula-list (getf parsed 'formula))
              (seq-list (getf parsed 'sequence))
              (m (length formula-list))
@@ -28,16 +27,21 @@
                  (clause (make-array len :element-type 'literal :initial-contents clause-list)))
             (setf (aref formula i) clause)))
         ;; build state
-        (let* ((s0 (make-solver-state))
-               (result-state (execute-macro-sequence s0 formula seq-list)))
-          ;; CRITICAL FIX: Update the cardinality gap relative to the root ancestor s0
-          (setf result-state (backtrack-to-ancestor result-state s0))
-          ;; print json
-          (format t "{\"status\": \"~A\", \"decisions\": ~D, \"props\": ~D, \"cardinality_gap\": ~D}~%"
-                  (string-downcase (symbol-name (ss-status result-state)))
-                  (ss-decisions result-state)
-                  (ss-props result-state)
-                  (ss-cardinality-gap result-state))
-          (finish-output))))))
+        (let ((s0 (make-solver-state)))
+          ;; Hydrate s0 with context literals without incrementing metrics
+          (dolist (lit context-list)
+            (push lit (ss-trail s0))
+            (push (cons (abs lit) (> lit 0)) (ss-assignment s0)))
+          ;; now run the macro sequence on hydrated state
+          (let ((result-state (execute-macro-sequence s0 formula seq-list)))
+            ;; Update the cardinality gap relative to the root ancestor s0
+            (setf result-state (backtrack-to-ancestor result-state s0))
+            ;; print json
+            (format t "{\"status\": \"~A\", \"decisions\": ~D, \"props\": ~D, \"cardinality_gap\": ~D}~%"
+                    (string-downcase (symbol-name (ss-status result-state)))
+                    (ss-decisions result-state)
+                    (ss-props result-state)
+                    (ss-cardinality-gap result-state))
+            (finish-output)))))))
 
 (main)
