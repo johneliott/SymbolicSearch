@@ -30,6 +30,8 @@
         ;; build state
         (let* ((s0 (make-solver-state))
                (result-state (execute-macro-sequence s0 formula seq-list)))
+          ;; CRITICAL FIX: Update the cardinality gap relative to the root ancestor s0
+          (setf result-state (backtrack-to-ancestor result-state s0))
           ;; print json
           (format t "{\"status\": \"~A\", \"decisions\": ~D, \"props\": ~D, \"cardinality_gap\": ~D}~%"
                   (string-downcase (symbol-name (ss-status result-state)))
