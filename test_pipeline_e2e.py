@@ -3,7 +3,7 @@ import unittest
 import subprocess
 
 # Import your live, unmodified production engine machinery
-from harness import LispKernel, evaluate_orbit, summarize
+from harness import LispKernel, evaluate_orbit, summarize, sample_permutations
 
 class TestLiveSATDeformationPipeline(unittest.TestCase):
     
@@ -54,12 +54,13 @@ class TestLiveSATDeformationPipeline(unittest.TestCase):
         
         try:
             # Run the actual orbit evaluation loop with a low perturbation count (N) for speed
+            samples = sample_permutations(self.production_sequence, 3)
             base, deltas = evaluate_orbit(
                 kernel=kernel,
                 formula=self.production_formula,
                 base_seq=self.production_sequence,
-                context=self.valid_context,
-                N=3
+                samples=samples,
+                context=self.valid_context
             )
             
             # Verify the core tracking state records correctly
@@ -76,7 +77,7 @@ class TestLiveSATDeformationPipeline(unittest.TestCase):
                 stats = summarize(deltas)
                 self.assertIn("tau_mean", stats)
                 self.assertIn("tau_var", stats)
-                self.assertIn("props_delta_var", stats)
+                self.assertIn("eta_var", stats)
                 
         finally:
             kernel.close()
@@ -89,12 +90,13 @@ class TestLiveSATDeformationPipeline(unittest.TestCase):
         contradictory_context = [10, -10]
         
         try:
+            samples = sample_permutations(self.production_sequence, 2)
             base, deltas = evaluate_orbit(
                 kernel=kernel,
                 formula=self.production_formula,
                 base_seq=self.production_sequence,
-                context=contradictory_context,
-                N=2
+                samples=samples,
+                context=contradictory_context
             )
             
             # Assert that the catch loop blocks the sequence run and outputs the correct failure token
