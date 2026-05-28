@@ -28,10 +28,14 @@ class TestLiveSATDeformationPipeline(unittest.TestCase):
         kernel = LispKernel(script_path="runner.lisp")
         
         try:
-            response = kernel.run_sequence(
+            init_res = kernel.init_formula(
                 formula=self.production_formula,
-                seq=self.production_sequence,
                 context=self.valid_context
+            )
+            self.assertEqual(init_res["status"], "initialized")
+            
+            response = kernel.run_sequence(
+                seq=self.production_sequence
             )
             
             # Validate structural integrity of your actual Lisp JSON output strings

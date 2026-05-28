@@ -4,79 +4,82 @@
   "Correctly separated correctness + measurement + sensitivity analysis."
 
   (let* ((c0 (make-array 3 :element-type 'literal :initial-contents '(-1 -2 3)))
-         (c1 (make-array 2 :element-type 'literal :initial-contents '(-3 4)))
-         (c2 (make-array 2 :element-type 'literal :initial-contents '(-4 5)))
-         (c3 (make-array 2 :element-type 'literal :initial-contents '(-2 -5)))
+       (c1 (make-array 2 :element-type 'literal :initial-contents '(-3 4)))
+       (c2 (make-array 2 :element-type 'literal :initial-contents '(-4 5)))
+       (c3 (make-array 2 :element-type 'literal :initial-contents '(-2 -5)))
 
-         (f  (make-array 4 :element-type 'clause
-                         :initial-contents (list c0 c1 c2 c3)))
+       (f  (make-array 4 :element-type 'clause
+                       :initial-contents (list c0 c1 c2 c3)))
+       (w  (setup-watches f))
+       (s0 (pre-flight-bcp (make-solver-state) f w))
+       (success t))
 
-         (s0 (make-solver-state))
-         (success t))
+  (format t "====================================================~%")
+  (format t "BCP KERNEL VERIFICATION HARNESS (REFACTORED)~%")
+  (format t "====================================================~%")
 
-    (format t "====================================================~%")
-    (format t "BCP KERNEL VERIFICATION HARNESS (REFACTORED)~%")
-    (format t "====================================================~%")
+  ;; ====================================================
+  ;; 1. SEMANTIC CORRECTNESS TESTS (HARD INVARIANTS)
+  ;; ====================================================
 
-    ;; ====================================================
-    ;; 1. SEMANTIC CORRECTNESS TESTS (HARD INVARIANTS)
-    ;; ====================================================
+  (let* ((local-f (deep-copy-formula f))
+         (local-w (deep-copy-watches w))
+         (res-a (execute-macro-sequence-watched s0 local-f local-w '(1 2)))
+         (local-f2 (deep-copy-formula f))
+         (local-w2 (deep-copy-watches w))
+         (res-b (execute-macro-sequence-watched s0 local-f2 local-w2 '(2 1))))
 
-    (let ((res-a (execute-macro-sequence s0 f '(1 2)))
-          (res-b (execute-macro-sequence s0 f '(2 1))))
+    (format t "[TRAJECTORY A] (1 2): Status ~A~%" (ss-status res-a))
+    (format t "[TRAJECTORY B] (2 1): Status ~A~%" (ss-status res-b))
 
-      (format t "[TRAJECTORY A] (1 2): Status ~A~%" (ss-status res-a))
-      (format t "[TRAJECTORY B] (2 1): Status ~A~%" (ss-status res-b))
+    ;; Only semantic invariant: both must resolve consistently
+    (unless (and (eq (ss-status res-a) :unsat)
+                 (eq (ss-status res-b) :unsat))
+      (setf success nil)
+      (format t ">> ERROR: Semantic SAT/UNSAT invariant violated.~%"))
 
-      ;; Only semantic invariant: both must resolve consistently
-      (unless (and (eq (ss-status res-a) :unsat)
-                   (eq (ss-status res-b) :unsat))
-        (setf success nil)
-        (format t ">> ERROR: Semantic SAT/UNSAT invariant violated.~%")))
+  ;; ====================================================
+  ;; 2. TRACE SANITY CHECKS (WEAK CONSTRAINTS)
+  ;; ====================================================
 
-    ;; ====================================================
-    ;; 2. TRACE SANITY CHECKS (WEAK CONSTRAINTS)
-    ;; ====================================================
+    ;; sanity: propagation must be non-negative
+    (unless (and (>= (ss-props res-a) 0)
+                 (>= (ss-props res-b) 0))
+      (setf success nil)
+      (format t ">> ERROR: Negative propagation count detected.~%"))
 
-    (let ((res-a (execute-macro-sequence s0 f '(1 2)))
-          (res-b (execute-macro-sequence s0 f '(2 1))))
+    (format t "[TRACE] Props A: ~D~%" (ss-props res-a))
+    (format t "[TRACE] Props B: ~D~%" (ss-props res-b))
 
-      ;; sanity: propagation must be non-negative
-      (unless (and (>= (ss-props res-a) 0)
-                   (>= (ss-props res-b) 0))
-        (setf success nil)
-        (format t ">> ERROR: Negative propagation count detected.~%"))
+  ;; ====================================================
+  ;; 3. PERMUTATION SENSITIVITY MEASUREMENT (NO ASSERTS)
+  ;; ====================================================
 
-      (format t "[TRACE] Props A: ~D~%" (ss-props res-a))
-      (format t "[TRACE] Props B: ~D~%" (ss-props res-b)))
+    (let ((delta-props (- (ss-props res-a)
+                          (ss-props res-b)))
 
-    ;; ====================================================
-    ;; 3. PERMUTATION SENSITIVITY MEASUREMENT (NO ASSERTS)
-    ;; ====================================================
+          (delta-decisions (- (ss-decisions res-a)
+                              (ss-decisions res-b))))
 
-    (let ((res-a (execute-macro-sequence s0 f '(1 2)))
-          (res-b (execute-macro-sequence s0 f '(2 1))))
+      (format t "====================================================~%")
+      (format t "PERMUTATION SENSITIVITY METRICS~%")
+      (format t "Δ Props      = ~D~%" delta-props)
+      (format t "Δ Decisions  = ~D~%" delta-decisions)
+      (format t "====================================================~%")))
 
-      (let ((delta-props (- (ss-props res-a)
-                            (ss-props res-b)))
+  ;; ====================================================
+  ;; 4. CONTEXT STABILITY / ISOLATION TEST
+  ;; ====================================================
 
-            (delta-decisions (- (ss-decisions res-a)
-                                (ss-decisions res-b))))
-
-        (format t "====================================================~%")
-        (format t "PERMUTATION SENSITIVITY METRICS~%")
-        (format t "Δ Props      = ~D~%" delta-props)
-        (format t "Δ Decisions  = ~D~%" delta-decisions)
-        (format t "====================================================~%")))
-
-    ;; ====================================================
-    ;; 4. CONTEXT STABILITY / ISOLATION TEST
-    ;; ====================================================
-
-    (let* ((sibling-ancestor (inject-literal s0 f -1 :is-decision t))
-           (branch-a (execute-macro-sequence sibling-ancestor f '(1 2)))
-           (branch-b (execute-macro-sequence sibling-ancestor f '(2 1))))
-
+  (let* ((local-f (deep-copy-formula f))
+         (local-w (deep-copy-watches w))
+         (sibling-ancestor (inject-literal-watched s0 local-f local-w -1 :is-decision t))
+         (local-f-a (deep-copy-formula local-f))
+         (local-w-a (deep-copy-watches local-w))
+         (branch-a (execute-macro-sequence-watched sibling-ancestor local-f-a local-w-a '(1 2)))
+         (local-f-b (deep-copy-formula local-f))
+         (local-w-b (deep-copy-watches local-w))
+         (branch-b (execute-macro-sequence-watched sibling-ancestor local-f-b local-w-b '(2 1))))
       (backtrack-to-ancestor branch-a sibling-ancestor)
       (backtrack-to-ancestor branch-b sibling-ancestor)
 
