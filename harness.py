@@ -16,10 +16,23 @@ class LispKernel:
             text=True
         )
 
-    def run_sequence(self, formula, seq, context=None):
+    def init_formula(self, formula, context=None):
         payload = json.dumps({
+            "type": "init",
             "context": context or [],
-            "formula": formula,
+            "formula": formula
+        })
+        self.process.stdin.write(payload + "\n")
+        self.process.stdin.flush()
+        line = self.process.stdout.readline()
+        if not line:
+            stderr = self.process.stderr.read()
+            raise RuntimeError(stderr)
+        return json.loads(line)
+
+    def run_sequence(self, seq):
+        payload = json.dumps({
+            "type": "seq",
             "sequence": list(seq)
         })
         self.process.stdin.write(payload + "\n")
@@ -44,17 +57,18 @@ def sample_permutations(seq, N):
         return [tuple(random.sample(seq, len(seq))) for _ in range(N)]
 
 def evaluate_orbit(kernel, formula, base_seq, samples, context=None):
-    base = kernel.run_sequence(formula, base_seq, context)
-    if base.get("status") == "init_conflict":
-        return base, []
+    init_res = kernel.init_formula(formula, context)
+    if init_res.get("status") == "init_conflict":
+        return init_res, []
 
+    base = kernel.run_sequence(base_seq)
     deltas = []
     
     # In your design, the raw decision count from the clean state is the stopping time tau
     base_tau = base["decisions"] 
     
     for pi in samples:
-        result = kernel.run_sequence(formula, pi, context)
+        result = kernel.run_sequence(pi)
         current_tau = result["decisions"]
         
         deltas.append({
