@@ -35,6 +35,20 @@ def parse_cnf_file(cnf_file_path):
 
 
 # BUILDS THE GRAPH FOR EACH VARIABLE TO ITS NEIGHBORING VARIABLE(S)/EDGES AND ALSO CALCULATES GLOBAL DEGREE OF EACH VARIABLE (total number of clause appearances across the formula)
+def find_pure_literals(formula):
+    pos = set()
+    neg = set()
+    for clause in formula:
+        for lit in clause:
+            if lit > 0:
+                pos.add(lit)
+            else:
+                neg.add(abs(lit))
+    pure_pos = pos - neg
+    pure_neg = neg - pos
+    pure_literals = list(pure_pos) + [-x for x in pure_neg]
+    return sorted(pure_literals, key=lambda x: (abs(x), x))
+
 def construct_variable_incidence_graph(formula):
     # nodes V = variables
     # edges E = co-occurrence in at least 1 clause
@@ -135,7 +149,7 @@ def generate_symmetric_group_orbit(m_ref):
 
 
 # outputs a JSON object with the following keys: metadata (dictionary with the source_benchmark filename, k_size, orbit_cardinality, and reference_macro m_ref); context: a list of literals representing the background assignment (A_0) (initialized now to an empty list); formula (raw CNF structure); orbit (list of lists, each sub-list is one permutation of the macro literals)
-def output_JSON(cnf_file_path, k, orbit, m_ref, formula):
+def output_JSON(cnf_file_path, k, orbit, m_ref, formula, context):
     output_payload = {
         "metadata" : {
             "source_benchmark": cnf_file_path,
@@ -143,8 +157,7 @@ def output_JSON(cnf_file_path, k, orbit, m_ref, formula):
             "orbit_cardinality": len(orbit),
             "m_ref": m_ref
         },
-        # empty for now since no background assignments yet
-        "context": [],
+        "context": context,
         "formula": formula,
         "orbit": orbit
     }
@@ -166,13 +179,15 @@ def main():
 
     variable_incidence_graph, global_degree = construct_variable_incidence_graph(formula)
 
+    pure_literals = find_pure_literals(formula)
+
     cluster_variables = extract_connected_k_cluster_via_bfs(variable_incidence_graph, global_degree, k)
 
     m_ref = polarity_assignment(formula, cluster_variables)
 
     orbit = generate_symmetric_group_orbit(m_ref)
 
-    output_payload = output_JSON(cnf_file_path, k, orbit, m_ref, formula)
+    output_payload = output_JSON(cnf_file_path, k, orbit, m_ref, formula, pure_literals)
 
 
     new_output_file_path = "pipeline_output_payload.json"
