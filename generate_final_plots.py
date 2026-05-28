@@ -29,8 +29,8 @@ def evaluate_and_plot(cnf_path, k, title, ax):
             print("INIT CONFLICT")
             return
         
-        taus = [d["tau"] for d in deltas]
-        etas = [d["eta"] for d in deltas]
+        taus = np.array([d["tau"] for d in deltas])
+        etas = np.array([d["eta"] for d in deltas])
         
         tau_mean = np.mean(taus)
         tau_var = np.var(taus)
@@ -43,15 +43,27 @@ def evaluate_and_plot(cnf_path, k, title, ax):
         print(f"  Var(eta): {eta_var:.4f}")
         print(f"  CV(eta):  {cv_eta:.4f}")
         
-        # Add a little jitter for the scatter plot to make overlapping points visible
-        jitter_taus = taus + np.random.normal(0, 0.05, len(taus))
-        jitter_etas = etas + np.random.normal(0, 0.05 * (np.max(etas) - np.min(etas) + 0.1), len(etas))
+        # Normalize Data (Z-Score)
+        tau_std = np.std(taus) if np.std(taus) > 0 else 1.0
+        eta_std = np.std(etas) if np.std(etas) > 0 else 1.0
+        
+        norm_taus = (taus - tau_mean) / tau_std
+        norm_etas = (etas - eta_mean) / eta_std
 
-        ax.scatter(jitter_taus, jitter_etas, alpha=0.5, edgecolors='none', color='dodgerblue')
+        ax.scatter(norm_taus, norm_etas, alpha=0.5, edgecolors='none', color='dodgerblue')
         ax.set_title(f"{title}\nVar(tau)={tau_var:.4f}, CV(eta)={cv_eta:.4f}")
-        ax.set_xlabel(r'$\tau$ (Stopping Time)')
-        ax.set_ylabel(r'$\eta$ (Propagation Velocity)')
-        ax.grid(True, linestyle='--', alpha=0.6)
+        ax.set_xlabel(r'Normalized $\tau$ (Stopping Time)')
+        ax.set_ylabel(r'Normalized $\eta$ (Propagation Velocity)')
+        
+        # Force the axes to treat a unit of X exactly equal to a unit of Y
+        ax.set_aspect('equal', adjustable='box')
+
+        # Hardcode identical coordinate limits across all three panels
+        ax.set_xlim([-3, 3])
+        ax.set_ylim([-3, 3])
+
+        # Add a subtle, fixed-grid background
+        ax.grid(True, linestyle='--', alpha=0.5)
         
     finally:
         kernel.close()
@@ -68,9 +80,10 @@ def main():
     # 3. Random 3-SAT
     evaluate_and_plot("generate_cnf_files/cnf/large/large_50vars_250clauses_000.cnf", 7, "Random 3-SAT\nPath-Dependent Profile", axs[2])
     
-    plt.tight_layout()
-    plt.savefig("thesis_defense_orbits.png", dpi=300)
-    print("\nSaved thesis_defense_orbits.png")
+    # Use tight_layout but leave extra room at the top for the titles
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.savefig("benchmark_comparison.png", dpi=300)
+    print("\nSaved benchmark_comparison.png")
 
 if __name__ == "__main__":
     main()
