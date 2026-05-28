@@ -46,14 +46,12 @@ def sample_permutations(seq, N):
 def evaluate_orbit(kernel, formula, base_seq, samples, context=None):
     base = kernel.run_sequence(formula, base_seq, context)
     if base.get("status") == "init_conflict":
-        print("Context is inherently contradictory. Skipping orbit evaluation.")
         return base, []
 
     deltas = []
     
     # In your design, the raw decision count from the clean state is the stopping time tau
     base_tau = base["decisions"] 
-    print(f"Evaluating orbit: {len(samples)} permutations. Base sequence halted at tau = {base_tau}")
     
     for pi in samples:
         result = kernel.run_sequence(formula, pi, context)
