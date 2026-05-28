@@ -1,4 +1,4 @@
-(load "bpc.lisp")
+(load "BCP_KERNEL.lisp")
 
 (defun run-verification-suite ()
   "Correctly separated correctness + measurement + sensitivity analysis."
