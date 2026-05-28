@@ -34,7 +34,7 @@
   ; Need to keep track of how variables were assigned/all assignments over time for full history to make sure we can do path analysis/determine causality/trace reconstruction
   ; What the SYSTEM did in response
   ; ((3 . t) (1 . t) (2 . nil))
-  (assignment     '()  :type list)
+  (assignment     (make-array 10000 :element-type '(unsigned-byte 2) :initial-element 0) :type (simple-array (unsigned-byte 2) (*)))
   ; SAT --> no conflict so far/UNSAT --> conflict reached/UNDEF --> undefined/lacks info to determine if SAT/UNSAT
   (status         :SAT :type (member :SAT :UNSAT :UNDEF))
 
@@ -54,6 +54,12 @@
 
 
 
+
+(defun copy-solver-state-safe (state)
+  (let ((new-state (copy-structure state)))
+    (setf (ss-assignment new-state) (copy-seq (ss-assignment state)))
+    new-state))
+
 ; THREE-VALUED EVALUATION ENGINE 
 ; options are true, false, or unknown
 
@@ -66,21 +72,12 @@
 ; if a binding exists (var . bool), a positive literal is :true if bool is T (otherwise, :false)
 
 (defun eval-literal (lit assignment)
-  ; creates a local variable named "binding" and lets it equal the pair in the assignment list whose key matches the variable ID = which is the absolute value of lit, THIS PULLS THE MOST RECENT BINDING SINCE ITS LIFO!!!
-  (let ((binding (assoc (abs lit) assignment)))
-    ; if no binding was found, then binding = nil, so the function should return :unknown
-    (if (null binding)
-      :unknown
-      ; now if a binding does exist, (there's a value for (var . bool)) 
-      (if (> lit 0)
-        ; lit is positive --> return true/false based on its value
-        (if (cdr binding) :true :false)
-        ; lit is negative --> return NOT/negated value, so true actually returns false, and false actually returns true
-        (if (cdr binding) :false :true)
-      )
-    )
-  )
-)
+  (let ((val (aref assignment (abs lit))))
+    (if (= val 0)
+        :unknown
+        (if (> lit 0)
+            (if (= val 1) :true :false)
+            (if (= val 1) :false :true)))))
 
 
 ; 2. evaluate-clause (clause assignment)
@@ -156,7 +153,7 @@
 
 (defun propagate (state formula)
   ; new-state is a SHALLOW COPY of the input state
-  (let ((new-state (copy-structure state)))
+  (let ((new-state (copy-solver-state-safe state)))
     ; keep looping until BCP reaches a fixed point where no changes are made
     (loop 
       ; loop as long as a boolean flag changed is T, and reset changed to nil at the start of the loop
@@ -186,10 +183,9 @@
                   (incf (ss-props new-state))
                   ; add the newly forced literal to the trail (to keep track of the new variable's assignment in chronological order)
                   (push forced-lit (ss-trail new-state))
-                  ; push the new variable ID and boolean value pair to the assignment list (tracking what the system did in response)
-                  (push (cons (abs forced-lit) (> forced-lit 0))
-                        (ss-assignment new-state)
-                  )
+                  ; update flat array
+                  (setf (aref (ss-assignment new-state) (abs forced-lit))
+                        (if (> forced-lit 0) 1 2))
                   ; set the changed tracking flag to true since we changed a variable's assignment
                   (setf changed t)
                   ; get out of the inner clause loop to begin scanning the clause from index 0
@@ -219,7 +215,7 @@
 
 (defun inject-literal (state formula lit &key is-decision)
   ; new-state is a SHALLOW COPY of the input state
-  (let ((new-state (copy-structure state)))
+  (let ((new-state (copy-solver-state-safe state)))
     ; if is-decision is passed in and its true (means its a macro decision):
     (when is-decision
       ; increments the ss-decisions (tracking the total number of MANUAL decisions/assignments made)
@@ -227,10 +223,9 @@
     )
     ; add the literal to the trail (to keep track of the new variable's assignment in chronological order)
     (push lit (ss-trail new-state))
-    ; push the new variable ID and boolean value pair to the assignment list (tracking what the system did in response)
-    (push (cons (abs lit) (> lit 0)) 
-          (ss-assignment new-state)
-    )
+    ; update flat array
+    (setf (aref (ss-assignment new-state) (abs lit))
+          (if (> lit 0) 1 2))
     ; returns the closed state by passing it directly to propagate -- EVERY MANUAL INJECTION TRIGGERS A FULL CLOSURE OPERATION!!!
     (propagate new-state formula)
   )
@@ -277,19 +272,6 @@
 
 
 (defun backtrack-to-ancestor (current ancestor)
-  ; extract the variable keys from both the current and ancestor states, and remove the duplicate entries of each
-  (let* ((current-vars
-            (remove-duplicates (mapcar #'car (ss-assignment current)))
-          )
-          (ancestor-vars 
-            (remove-duplicates (mapcar #'car (ss-assignment ancestor)))
-          )
-          ; compute the absolute difference between the current and ancestor states' assignment lists' lengths with duplicates removed and save it in gap
-          (gap (abs (- (length current-vars) (length ancestor-vars)))
-          )
-        )
-      ; write the resulting scalar into the current state's structure under the cardinality gap and return the modified current state
-      (setf (ss-cardinality-gap current) gap) 
-      current
-  )
-)
+  (let ((gap (abs (- (length (ss-trail current)) (length (ss-trail ancestor))))))
+    (setf (ss-cardinality-gap current) gap)
+    current))
