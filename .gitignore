@@ -10,3 +10,4 @@ __pycache__/
 
 # Common ignores
 .DS_Store
+bmc_crypto_benchmarks/xor_cnfs/
