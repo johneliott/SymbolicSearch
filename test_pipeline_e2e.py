@@ -10,7 +10,7 @@ class TestLiveSATDeformationPipeline(unittest.TestCase):
     def setUp(self):
         """Verify workspace integrity and initialize realistic test inputs."""
         # Ensure production files exist in the path before attempting to run
-        self.assertTrue(os.path.exists("bpc.lisp"), "Production 'bpc.lisp' not found in working directory.")
+        self.assertTrue(os.path.exists("BCP_KERNEL.lisp"), "Production 'BCP_KERNEL.lisp' not found in working directory.")
         self.assertTrue(os.path.exists("runner.lisp"), "Production 'runner.lisp' not found in working directory.")
         
         # A tiny, valid horn-like formula: (x1 v x2) ^ (~x1 v x3)

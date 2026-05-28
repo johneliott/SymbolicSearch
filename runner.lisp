@@ -1,4 +1,4 @@
-(load "bpc.lisp")
+(load "BCP_KERNEL.lisp")
 
 (defun parse-naive-json (str)
   (let* ((s1 (substitute #\( #\[ str))
@@ -9,6 +9,15 @@
          (s6 (remove #\} s5))
          (s7 (remove #\" s6)))
     (read-from-string (concatenate 'string "(" s7 ")"))))
+
+(defun shuffle-array (arr)
+  (let ((n (length arr)))
+    (loop for i from (1- n) downto 1 do
+      (let* ((j (random (1+ i)))
+             (temp (aref arr i)))
+        (setf (aref arr i) (aref arr j))
+        (setf (aref arr j) temp)))
+    arr))
 
 (defun main ()
   (loop
@@ -26,16 +35,18 @@
                  (len (length clause-list))
                  (clause (make-array len :element-type 'literal :initial-contents clause-list)))
             (setf (aref formula i) clause)))
+        ;; shuffle formula database exactly once per execution to eliminate memory-layout priority bias
+        (shuffle-array formula)
         ;; build state
         (let ((s0 (make-solver-state)))
           ;; 1. Hydrate s0 with context literals
           (let ((conflict nil))
             (dolist (lit context-list)
-              (let ((existing (assoc (abs lit) (ss-assignment s0))))
-                (when (and existing (not (eq (cdr existing) (> lit 0))))
+              (let ((val (aref (ss-assignment s0) (abs lit))))
+                (when (and (> val 0) (not (= val (if (> lit 0) 1 2))))
                   (setf conflict t)))
               (push lit (ss-trail s0))
-              (push (cons (abs lit) (> lit 0)) (ss-assignment s0)))
+              (setf (aref (ss-assignment s0) (abs lit)) (if (> lit 0) 1 2)))
             (when conflict
               (setf (ss-status s0) :unsat)))
           
